@@ -1,0 +1,107 @@
+Create table Holidays(
+h_id int not null Primary key,
+h_name varchar(50) not null)
+
+Create table Date_Holidays(
+h_id int not null,
+h_date date not null)
+
+Alter table Date_Holidays
+with check add constraint FK_H_Date foreign key(h_id)
+references  Holidays(h_id)
+on update no action
+on delete no action
+
+insert into  Holidays values
+(1,'Новый год'),
+(2,'Рождество Христово по старому стилю'),
+(3,'Международный женский день'),
+(4,'Пасха'),
+(5,'День международной солидарности трудящихся'),
+(6,'Радуница'),
+(7,'День Победы'),
+(8,'Международный день защиты детей'),
+(9,'День независимости'),
+(10,'Праздник "Лимба ноастрэ"'),
+(11,'Рождество Христово по новому стилю')
+
+insert into Date_Holidays values
+(1,'2019.01.01'),
+(2,'2019.01.07'),
+(2,'2019.01.08'),
+(3,'2019.03.08'),
+(4,'2019.04.28'),
+(4,'2019.04.29'),
+(5,'2019.05.01'),
+(6,'2019.05.06'),
+(7,'2019.05.09'),
+(8,'2019.06.01'),
+(9,'2019.08.27'),
+(10,'2019.08.31'),
+(11,'2019.12.25')
+
+Select distinct  h.h_id from Holidays h, Date_Holidays dh
+where h.h_id=dh.h_id and h.h_name='Рождество Христово по старому стилю'
+
+Select h.h_id,h.h_name,dh.h_date from Holidays h, Date_Holidays dh
+where h.h_id=dh.h_id
+______________________________________________________________________
+P.S.:Так как даты в Sale в 2011 году, для этих продаж будет тригер для запрета удаления и 
+обновления только на выходные, а уже в 2019 году и выходные и празничные дни
+
+Create trigger del_upd_sale on Sale
+INSTEAD OF delete,update
+as
+declare @Day_Sale date
+declare @Name_Holiday varchar(50)
+Select @Day_Sale = d.data from Sale sa,deleted d
+where  sa.c_id=d.c_id and
+sa.p_id=d.p_id and
+sa.sp_id=d.sp_id and
+sa.qty=d.qty;
+Select @Name_Holiday=(Select h.h_name from Holidays h,Date_Holidays dh
+where h.h_id =dh.h_id and dh.h_date=@Day_Sale)
+declare @day int
+declare @month varchar(10)
+declare @year int
+Select @year=year(@Day_Sale)
+Select @month=DATENAME(mm,MONTH(@Day_Sale))
+select @day=day(@Day_Sale)
+
+declare @Name_Day_Sale varchar(50)
+Select @Name_Day_Sale = datename(w, d.data) from Sale sa,deleted d
+where  sa.c_id=d.c_id and
+sa.p_id=d.p_id and
+sa.sp_id=d.sp_id and
+sa.qty=d.qty;
+
+if @Day_Sale in(Select h_date from Date_Holidays)
+begin
+Rollback tran
+RAISERROR('Сегодня празничный день = %d-%s-%d, %s',10,1,@day,@month,@year,@Name_Holiday)
+end
+
+if  @Name_Day_Sale='Saturday' or @Name_Day_Sale='Sunday'
+begin
+Rollback tran
+RAISERROR('Day = %s',10,1,@Name_Day_Sale)
+end
+________________________________________________
+delete from Sale
+where data = '2011.02.12'                       //Saturday 
+
+update Sale set p_id = 2518
+where data = '2011.02.12'
+
+insert into Sale values
+('2019.01.07',100,2241,10,20)           //Ввожу праздничный день
+
+delete from Sale
+ where data = '2019.01.07'
+
+update Sale set p_id = 2518
+where data = '2019.01.07' 
+
+
+
+
